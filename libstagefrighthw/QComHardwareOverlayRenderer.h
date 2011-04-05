@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,27 +15,28 @@
  * limitations under the License.
  */
 
-#ifndef QCOM_HARDWARE_RENDERER_H_
+#ifndef QCOM_HARDWARE_OVERLAY_RENDERER_H_
 
-#define QCOM_HARDWARE_RENDERER_H_
+#define QCOM_HARDWARE_OVERLAY_RENDERER_H_
 
 #include <media/stagefright/VideoRenderer.h>
 #include <utils/RefBase.h>
+#include <ui/Overlay.h>
+#include <sys/types.h>
 
 namespace android {
 
 class ISurface;
 class MemoryHeapPmem;
 
-class QComHardwareRenderer : public VideoRenderer {
+class QComHardwareOverlayRenderer : public VideoRenderer {
 public:
-    QComHardwareRenderer(
+    QComHardwareOverlayRenderer(
             const sp<ISurface> &surface,
             size_t displayWidth, size_t displayHeight,
-            size_t decodedWidth, size_t decodedHeight,
-            int32_t rotationDegrees);
+            size_t decodedWidth, size_t decodedHeight);
 
-    virtual ~QComHardwareRenderer();
+    virtual ~QComHardwareOverlayRenderer();
 
     virtual void render(
             const void *data, size_t size, void *platformPrivate);
@@ -44,7 +46,6 @@ private:
     size_t mDisplayWidth, mDisplayHeight;
     size_t mDecodedWidth, mDecodedHeight;
     size_t mFrameSize;
-    int32_t mRotationDegrees;
     sp<MemoryHeapPmem> mMemoryHeap;
 
     //Statistics profiling
@@ -60,10 +61,13 @@ private:
     bool getOffset(void *platformPrivate, size_t *offset);
     void publishBuffers(uint32_t pmem_fd);
 
-    QComHardwareRenderer(const QComHardwareRenderer &);
-    QComHardwareRenderer &operator=(const QComHardwareRenderer &);
+    QComHardwareOverlayRenderer(const QComHardwareOverlayRenderer &);
+    QComHardwareOverlayRenderer &operator=(const QComHardwareOverlayRenderer &);
+
+    sp<Overlay>                 mOverlay;
+    uint32_t                      mFd;
 };
 
 }  // namespace android
 
-#endif  // QCOM_HARDWARE_RENDERER_H_
+#endif  // QCOM_HARDWARE_OVERLAY_RENDERER_H_

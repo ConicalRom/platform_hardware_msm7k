@@ -100,8 +100,66 @@ class PmemAllocatorDepsDeviceImpl : public PmemUserspaceAllocator::Deps,
         return ::munmap(start, length);
     }
 
+
     virtual int open(const char* pathname, int flags, int mode) {
         return ::open(pathname, flags, mode);
+
+        err = init_pmem_area(m);
+        if (err == 0) {
+            // PMEM buffers are always mmapped
+            base = m->pmem_master_base;
+            lockState |= private_handle_t::LOCK_STATE_MAPPED;
+
+            offset = sAllocator.allocate(size);
+            if (offset < 0) {
+                // no more pmem memory
+                err = -ENOMEM;
+            } else {
+                struct pmem_region sub = { offset, size };
+                int openFlags = O_RDWR | O_SYNC;
+                uint32_t uread = usage & GRALLOC_USAGE_SW_READ_MASK;
+                uint32_t uwrite = usage & GRALLOC_USAGE_SW_WRITE_MASK;
+                if (uread == GRALLOC_USAGE_SW_READ_OFTEN ||
+                    uwrite == GRALLOC_USAGE_SW_WRITE_OFTEN) {
+                    openFlags &= ~O_SYNC;
+                }
+
+                // now create the "sub-heap"
+                fd = open("/dev/pmem", openFlags, 0);
+                err = fd < 0 ? fd : 0;
+                
+                // and connect to it
+                if (err == 0)
+                    err = ioctl(fd, PMEM_CONNECT, m->pmem_master);
+
+                // and make it available to the client process
+                if (err == 0)
+                    err = ioctl(fd, PMEM_MAP, &sub);
+
+                if (err < 0) {
+                    err = -errno;
+                    close(fd);
+                    sAllocator.deallocate(offset);
+                    fd = -1;
+                } else {
+                    memset((char*)base + offset, 0, size);
+                    // clean and invalidate the new allocation
+                    cacheflush(intptr_t(base) + offset,
+				intptr_t(base) + offset + size, 0);
+                }
+                //LOGD_IF(!err, "allocating pmem size=%d, offset=%d", size, offset);
+            }
+        } else {
+            if ((usage & GRALLOC_USAGE_HW_2D) == 0) {
+                // the caller didn't request PMEM, so we can try something else
+                flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
+                err = 0;
+                goto try_ashmem;
+            } else {
+                LOGE("couldn't open pmem (%s)", strerror(errno));
+            }
+        }
+
     }
 
     virtual int close(int fd) {
